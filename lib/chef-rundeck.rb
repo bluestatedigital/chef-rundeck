@@ -70,7 +70,7 @@ class ChefRundeck < Sinatra::Base
           next
         end
         rundeckNode.osArch = node['automatic']['kernel']['machine']
-        rundeckNode.osFamily = node['automatic']['platform']
+        rundeckNode.osName = node['automatic']['platform']
         rundeckNode.osVersion = node['automatic']['platform_version']
 
         if(node['automatic'].has_key?("kernel"))
