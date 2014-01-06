@@ -48,30 +48,98 @@ class ChefRundeck < Sinatra::Base
   get '/' do
     content_type 'text/xml'
     response = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE project PUBLIC "-//DTO Labs Inc.//DTD Resources Document 1.0//EN" "project.dtd"><project>'
-    rest = Chef::REST.new(ChefRundeck.api_url, ChefRundeck.username, ChefRundeck.client_key)
+    rest = Chef::REST.new(ChefRundeck.api_url)
     nodes = rest.get_rest("/nodes/")    
-      
+
+    rundeckNodes = {}
     nodes.keys.each do |node_name|
       node = rest.get_rest("/nodes/#{node_name}")
       #--
       # Certain features in Rundeck require the osFamily value to be set to 'unix' to work appropriately. - SRK
       #++
-      os_family = node[:kernel][:os] =~ /windows/i ? 'windows' : 'unix'
-      response << <<-EOH
-<node name="#{xml_escape(node[:fqdn])}"
-      type="Node"
-      description="#{xml_escape(node_name)}"
-      osArch="#{xml_escape(node[:kernel][:machine])}"
-      osFamily="#{xml_escape(os_family)}"
-      osName="#{xml_escape(node[:platform])}"
-      osVersion="#{xml_escape(node[:platform_version])}"
-      tags="#{xml_escape([node.chef_environment, node[:tags].join(','), node.run_list.roles.join(',')].join(','))}"
-      username="#{xml_escape(ChefRundeck.username)}"
-      hostname="#{xml_escape(node[:fqdn])}"
-      editUrl="#{xml_escape(ChefRundeck.web_ui_url)}/nodes/#{xml_escape(node_name)}/edit"/>
-EOH
+      begin 
+        rundeckNode = RundeckNode.new
+
+        rundeckNode.description = node_name
+        rundeckNode.nodename = node_name
+
+        if(!node.has_key?("automatic"))
+          next
+        end
+        rundeckNode.osArch = node['automatic']['kernel']['machine']
+        rundeckNode.osFamily = node['automatic']['platform']
+        rundeckNode.osVersion = node['automatic']['platform_version']
+
+        if(node['automatic'].has_key?("kernel"))
+          rundeckNode.osFamily = node['automatic']['kernel']['os'] =~ /windows/i ? 'windows' : 'unix'
+        else
+          rundeckNode.osFamily = "unknown"
+        end
+
+        if(!node['automatic'].has_key?('fqdn'))
+          rundeckNode.hostname = node['automatic']['hostname']
+        else
+          rundeckNode.hostname = node['automatic']['fqdn']
+        end
+
+        node['automatic']['recipes'].each do |recipe|
+          rundeckNode.add_tag("recipe[" + recipe + "]")
+        end
+        node['automatic']['roles'].each do |role|
+          rundeckNode.add_tag("role[" + role + "]")
+        end
+        node['normal']['tags'].each do |tag|
+          rundeckNode.add_tag(tag)
+        end
+
+        rundeckNode.username = ChefRundeck.username
+        rundeckNode.editUrl = "#{ChefRundeck.web_ui_url}/nodes/#{node_name}/edit"
+        rundeckNodes[node_name] = rundeckNode
+
+
+
+      rescue Exception => ex
+        puts ex.message
+        puts ex.backtrace.join("\n")
+        puts JSON.dump(node)
+      end
     end
-    response << "</project>"
-    response
+    rundeckNodes.to_yaml
+  end
+end
+
+class RundeckNode
+  attr_accessor :nodename
+  attr_accessor :type
+  attr_accessor :description
+  attr_accessor :osArch
+  attr_accessor :osName
+  attr_accessor :osVersion
+  attr_accessor :osFamily
+  attr_accessor :username
+  attr_accessor :editUrl
+  attr_reader   :hostname
+
+  def initialize
+  end
+
+  def hostname=(hostname)
+    if hostname =~ /\.bluestatedigital.com/ && hostname !~ /\.colo\.bluestatedigital\.com/
+      hostname = hostname.sub(/\.bluestatedigital\.com/, ".colo.bluestatedigital.com")
+    end
+    @hostname = hostname
+  end
+
+  def tags
+    @tags.join(',')
+  end
+  def tags=(tags)
+    @tags = tags
+  end
+  def add_tag(tag)
+    if(!@tags)
+      @tags = []
+    end
+    @tags.push(tag)
   end
 end
