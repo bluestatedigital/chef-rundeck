@@ -29,11 +29,6 @@ class ChefRundeckCLI
      :long => "--api-url API_URL",
      :description => "The base URL of the Chef REST API"
 
-   option :client_key,
-     :short => "-k KEYFILE",
-     :long => "--key-file KEYFILE",
-     :description => "The client.pem to sign requests"
- 
    option :config_file,
      :short => "-c CONFIG",
      :long  => "--config CONFIG",
