@@ -19,6 +19,7 @@ require 'chef'
 require 'chef/node'
 require 'chef/mixin/xml_escape'
 require 'chef/rest'
+require 'JSON'
 
 class ChefRundeck < Sinatra::Base
 
